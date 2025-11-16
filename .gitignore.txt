@@ -1,0 +1,9 @@
+
+# git ignore files specifies which files not to track\
+
+data/
+
+temp/
+
+*.docx
+*.doc
