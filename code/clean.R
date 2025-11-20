@@ -1,3 +1,3 @@
 # file!
 
-#aadding somethiing to see what happens
+#adding something to see what happens

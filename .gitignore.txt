@@ -7,3 +7,5 @@ temp/
 
 *.docx
 *.doc
+
+!data/HVS23
