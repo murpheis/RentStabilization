@@ -1,0 +1,711 @@
+---
+title: "HVS Data"
+output: html_notebook
+---
+
+
+
+```{r}
+library(tidycensus)
+library(tidyverse)
+library(srvyr)
+library(data.table)
+library(outreg)
+library(fixest)
+library(tidyr)
+library(AER)
+library(ggplot2)
+library(dplyr)
+library(descriptio)
+```
+
+```{r}
+#Builing the stacked status-size bar shart using the '23 HVS all units data
+all_units <- read_csv("/Users/lizcooper/Documents/FPI Projects/Rent Stabilization Project/RentStabilization/data/allunits_puf_23.csv")
+
+all_units
+```
+
+```{r}
+all_units <- all_units %>%
+  mutate(legal_status = c(0))
+
+all_units$legal_status <- ifelse(all_units$CSR == "02" | all_units$CSR == "06" | all_units$CSR == "12" | all_units$CSR == "96", all_units$legal_status <- "Owner", 
+                                 ifelse(all_units$CSR == "32", all_units$legal_status <- "Rent Stabilized", 
+                                        ifelse(all_units$CSR == "05" | all_units$CSR == "90" | all_units$CSR == "97", all_units$legal_status <- "Rent Regulated (Other)", 
+                                               ifelse(all_units$CSR == "80", all_units$legal_status <- "Market Rate", NA))))
+
+filled_units <- all_units %>%
+  filter(CSR != "04")
+
+filled_units$BEDROOMS <- as.integer(filled_units$BEDROOMS)
+
+filled_units <- filled_units %>%
+  mutate(bedroom_count = c(0))
+
+filled_units
+
+```
+
+```{r}
+
+filled_units$bedroom_count <- ifelse(filled_units$BEDROOMS == 0, filled_units$bedroom_count <- "Studio", ifelse(filled_units$BEDROOMS == 1, filled_units$bedroom_count <- "One Bedroom", ifelse(filled_units$BEDROOMS == 2, filled_units$bedroom_count <- "Two Bedrooms", ifelse(filled_units$BEDROOMS == 3, filled_units$bedroom_count <- "Three Bedrooms", ifelse(filled_units$BEDROOMS == 4 | filled_units$BEDROOMS == 5 | filled_units$BEDROOMS == 6, filled_units$bedroom_count <- "Four or More Bedrooms", NA)))))
+
+bedrooms <- filled_units %>%
+  select(bedroom_count)
+                                                                                                                
+                                                                                                              
+bedrooms
+filled_units
+
+```
+
+
+
+```{r}
+filled_units$bedroom_count <- factor(filled_units$bedroom_count, levels=c('Four or More Bedrooms', 'Three Bedrooms', 'Two Bedrooms', "One Bedroom", "Studio"))
+
+type_bar <- ggplot(data = filled_units, aes(x = legal_status, y = FW, fill = bedroom_count, group = bedroom_count)) +
+              geom_bar(position = "stack", stat = "identity") +
+              scale_fill_hue()
+                      
+                   
+type_bar
+```
+
+
+```{r}
+#Building the status-size 21-23 time series stacked bar shart with the '23 and '21 HVS data sets 
+all_units_21 <- read.csv("/Users/lizcooper/Downloads/allunits_puf_21.csv")
+
+all_units_21
+```
+
+```{r}
+filled_units_21 <- all_units_21 %>%
+  filter(CSR != 4, CSR != 3)
+
+filled_units_21 <- filled_units_21 %>%
+  mutate(legal_status = 0)
+
+filled_units_21$legal_status <- ifelse(filled_units_21$CSR == 2 | filled_units_21$CSR == 6 | filled_units_21$CSR == 12 | filled_units_21$CSR == 96, filled_units_21$legal_status <- "Owner", 
+                                 ifelse(filled_units_21$CSR == 32, filled_units_21$legal_status <- "Rent Stabilized", 
+                                        ifelse(filled_units_21$CSR == 5 | filled_units_21$CSR == 90 | filled_units_21$CSR == 97, filled_units_21$legal_status <- "Rent Regulated (Other)", 
+                                               ifelse(filled_units_21$CSR == 80, filled_units_21$legal_status <- "Market Rate", NA))))
+
+status <- filled_units_21 %>%
+  select(legal_status)
+
+filled_units_21
+status
+```
+
+```{r}
+filled_units_21 <- filled_units_21 %>%
+  mutate(bedroom_count = c(0))
+
+filled_units_21$bedroom_count <- ifelse(filled_units_21$BEDROOMS == 0, filled_units_21$bedroom_count <- "Studio", ifelse(filled_units_21$BEDROOMS == 1, filled_units_21$bedroom_count <- "One Bedroom", ifelse(filled_units_21$BEDROOMS == 2, filled_units_21$bedroom_count <- "Two Bedrooms", ifelse(filled_units_21$BEDROOMS == 3, filled_units_21$bedroom_count <- "Three Bedrooms", ifelse(filled_units_21$BEDROOMS == 4 | filled_units_21$BEDROOMS == 5 | filled_units_21$BEDROOMS == 6, filled_units_21$bedroom_count <- "Four or More Bedrooms", NA)))))
+
+
+filled_units_21
+```
+
+
+```{r}
+stabilized_studio_23 <- filled_units %>%
+  filter(legal_status == "Rent Stabilized", bedroom_count == "Studio")
+
+stabilized_studio_23_sum <- sum(stabilized_studio_23$FW)
+
+stabilized_studio_23
+stabilized_studio_23_sum
+
+stabilized_studio_21 <- filled_units_21 %>%
+  filter(legal_status == "Rent Stabilized", bedroom_count == "Studio")
+stabilized_studio_21_sum <- sum(stabilized_studio_21$FW)
+  
+stabilized_studio_21
+stabilized_studio_21_sum
+
+stabilized_studio_change <- stabilized_studio_23_sum - stabilized_studio_21_sum
+
+stabilized_studio_change
+
+```
+
+```{r}
+stabilized_one_23 <- filled_units %>%
+  filter(legal_status == "Rent Stabilized", bedroom_count == "One Bedroom")
+
+stabilized_one_23_sum <- sum(stabilized_one_23$FW)
+
+stabilized_one_23
+stabilized_one_23_sum
+
+stabilized_one_21 <- filled_units_21 %>%
+  filter(legal_status == "Rent Stabilized", bedroom_count == "One Bedroom")
+stabilized_one_21_sum <- sum(stabilized_one_21$FW)
+  
+stabilized_one_21
+stabilized_one_21_sum
+
+stabilized_one_change <- stabilized_one_23_sum - stabilized_one_21_sum
+
+stabilized_one_change
+```
+
+```{r}
+stabilized_two_23 <- filled_units %>%
+  filter(legal_status == "Rent Stabilized", bedroom_count == "Two Bedrooms")
+
+stabilized_two_23_sum <- sum(stabilized_two_23$FW)
+
+stabilized_two_23
+stabilized_two_23_sum
+
+stabilized_two_21 <- filled_units_21 %>%
+  filter(legal_status == "Rent Stabilized", bedroom_count == "Two Bedrooms")
+stabilized_two_21_sum <- sum(stabilized_two_21$FW)
+  
+stabilized_two_21
+stabilized_two_21_sum
+
+stabilized_two_change <- stabilized_two_23_sum - stabilized_two_21_sum
+
+stabilized_two_change
+```
+
+```{r}
+stabilized_three_23 <- filled_units %>%
+  filter(legal_status == "Rent Stabilized", bedroom_count == "Three Bedrooms")
+
+stabilized_three_23_sum <- sum(stabilized_three_23$FW)
+
+stabilized_three_23
+stabilized_three_23_sum
+
+stabilized_three_21 <- filled_units_21 %>%
+  filter(legal_status == "Rent Stabilized", bedroom_count == "Three Bedrooms")
+stabilized_three_21_sum <- sum(stabilized_three_21$FW)
+  
+stabilized_three_21
+stabilized_three_21_sum
+
+stabilized_three_change <- stabilized_three_23_sum - stabilized_three_21_sum
+
+stabilized_three_change
+```
+
+```{r}
+stabilized_many_23 <- filled_units %>%
+  filter(legal_status == "Rent Stabilized", bedroom_count == "Four or More Bedrooms")
+
+stabilized_many_23_sum <- sum(stabilized_many_23$FW)
+
+stabilized_many_23
+stabilized_many_23_sum
+
+stabilized_many_21 <- filled_units_21 %>%
+  filter(legal_status == "Rent Stabilized", bedroom_count == "Four or More Bedrooms")
+stabilized_many_21_sum <- sum(stabilized_many_21$FW)
+  
+stabilized_many_21
+stabilized_many_21_sum
+
+stabilized_many_change <- stabilized_many_23_sum - stabilized_many_21_sum
+
+stabilized_many_change
+```
+
+
+```{r}
+reg_studio_23 <- filled_units %>%
+  filter(legal_status == "Rent Regulated (Other)", bedroom_count == "Studio")
+
+reg_studio_23_sum <- sum(reg_studio_23$FW)
+
+reg_studio_23
+reg_studio_23_sum
+
+reg_studio_21 <- filled_units_21 %>%
+  filter(legal_status == "Rent Regulated (Other)", bedroom_count == "Studio")
+reg_studio_21_sum <- sum(reg_studio_21$FW)
+  
+reg_studio_21
+reg_studio_21_sum
+
+reg_studio_change <- reg_studio_23_sum - reg_studio_21_sum
+
+reg_studio_change
+```
+
+```{r}
+reg_one_23 <- filled_units %>%
+  filter(legal_status == "Rent Regulated (Other)", bedroom_count == "One Bedroom")
+
+reg_one_23_sum <- sum(reg_one_23$FW)
+
+reg_one_23
+reg_one_23_sum
+
+reg_one_21 <- filled_units_21 %>%
+  filter(legal_status == "Rent Regulated (Other)", bedroom_count == "One Bedroom")
+reg_one_21_sum <- sum(reg_one_21$FW)
+  
+reg_one_21
+reg_one_21_sum
+
+reg_one_change <- reg_one_23_sum - reg_one_21_sum
+
+reg_one_change
+```
+
+```{r}
+reg_two_23 <- filled_units %>%
+  filter(legal_status == "Rent Regulated (Other)", bedroom_count == "Two Bedrooms")
+
+reg_two_23_sum <- sum(reg_two_23$FW)
+
+reg_two_23
+reg_two_23_sum
+
+reg_two_21 <- filled_units_21 %>%
+  filter(legal_status == "Rent Regulated (Other)", bedroom_count == "Two Bedrooms")
+reg_two_21_sum <- sum(reg_two_21$FW)
+  
+reg_two_21
+reg_two_21_sum
+
+reg_two_change <- reg_two_23_sum - reg_two_21_sum
+
+reg_two_change
+```
+
+```{r}
+reg_three_23 <- filled_units %>%
+  filter(legal_status == "Rent Regulated (Other)", bedroom_count == "Three Bedrooms")
+
+reg_three_23_sum <- sum(reg_three_23$FW)
+
+reg_three_23
+reg_three_23_sum
+
+reg_three_21 <- filled_units_21 %>%
+  filter(legal_status == "Rent Regulated (Other)", bedroom_count == "Three Bedrooms")
+reg_three_21_sum <- sum(reg_three_21$FW)
+  
+reg_three_21
+reg_three_21_sum
+
+reg_three_change <- reg_three_23_sum - reg_three_21_sum
+
+reg_three_change
+```
+
+```{r}
+reg_many_23 <- filled_units %>%
+  filter(legal_status == "Rent Regulated (Other)", bedroom_count == "Four or More Bedrooms")
+
+reg_many_23_sum <- sum(reg_many_23$FW)
+
+reg_many_23
+reg_many_23_sum
+
+reg_many_21 <- filled_units_21 %>%
+  filter(legal_status == "Rent Regulated (Other)", bedroom_count == "Four or More Bedrooms")
+reg_many_21_sum <- sum(reg_many_21$FW)
+  
+reg_many_21
+reg_many_21_sum
+
+reg_many_change <- reg_many_23_sum - reg_many_21_sum
+
+reg_many_change
+```
+
+```{r}
+market_studio_23 <- filled_units %>%
+  filter(legal_status == "Market Rate", bedroom_count == "Studio")
+
+market_studio_23_sum <- sum(market_studio_23$FW)
+
+market_studio_23
+market_studio_23_sum
+
+market_studio_21 <- filled_units_21 %>%
+  filter(legal_status == "Market Rate", bedroom_count == "Studio")
+market_studio_21_sum <- sum(market_studio_21$FW)
+  
+market_studio_21
+market_studio_21_sum
+
+market_studio_change <- market_studio_23_sum - market_studio_21_sum
+
+market_studio_change
+```
+
+```{r}
+market_one_23 <- filled_units %>%
+  filter(legal_status == "Market Rate", bedroom_count == "One Bedroom")
+
+market_one_23_sum <- sum(market_one_23$FW)
+
+market_one_23
+market_one_23_sum
+
+market_one_21 <- filled_units_21 %>%
+  filter(legal_status == "Market Rate", bedroom_count == "One Bedroom")
+market_one_21_sum <- sum(market_one_21$FW)
+  
+market_one_21
+market_one_21_sum
+
+market_one_change <- market_one_23_sum - market_one_21_sum
+
+market_one_change
+```
+
+```{r}
+market_two_23 <- filled_units %>%
+  filter(legal_status == "Market Rate", bedroom_count == "Two Bedrooms")
+
+market_two_23_sum <- sum(market_two_23$FW)
+
+market_two_23
+market_two_23_sum
+
+market_two_21 <- filled_units_21 %>%
+  filter(legal_status == "Market Rate", bedroom_count == "Two Bedrooms")
+market_two_21_sum <- sum(market_two_21$FW)
+  
+market_two_21
+market_two_21_sum
+
+market_two_change <- market_two_23_sum - market_two_21_sum
+
+market_two_change
+```
+
+```{r}
+market_three_23 <- filled_units %>%
+  filter(legal_status == "Market Rate", bedroom_count == "Three Bedrooms")
+
+market_three_23_sum <- sum(market_three_23$FW)
+
+market_three_23
+market_three_23_sum
+
+market_three_21 <- filled_units_21 %>%
+  filter(legal_status == "Market Rate", bedroom_count == "Three Bedrooms")
+market_three_21_sum <- sum(market_three_21$FW)
+  
+market_three_21
+market_three_21_sum
+
+market_three_change <- market_three_23_sum - market_three_21_sum
+
+market_three_change
+```
+
+
+```{r}
+market_many_23 <- filled_units %>%
+  filter(legal_status == "Market Rate", bedroom_count == "Four or More Bedrooms")
+
+market_many_23_sum <- sum(market_many_23$FW)
+
+market_many_23
+market_many_23_sum
+
+market_many_21 <- filled_units_21 %>%
+  filter(legal_status == "Market Rate", bedroom_count == "Four or More Bedrooms")
+market_many_21_sum <- sum(market_many_21$FW)
+  
+market_many_21
+market_many_21_sum
+
+market_many_change <- market_many_23_sum - market_many_21_sum
+
+market_many_change
+```
+
+```{r}
+own_studio_23 <- filled_units %>%
+  filter(legal_status == "Owner", bedroom_count == "Studio")
+
+own_studio_23_sum <- sum(own_studio_23$FW)
+
+own_studio_23
+own_studio_23_sum
+
+own_studio_21 <- filled_units_21 %>%
+  filter(legal_status == "Owner", bedroom_count == "Studio")
+own_studio_21_sum <- sum(own_studio_21$FW)
+  
+own_studio_21
+own_studio_21_sum
+
+own_studio_change <- own_studio_23_sum - own_studio_21_sum
+
+own_studio_change
+```
+
+```{r}
+own_one_23 <- filled_units %>%
+  filter(legal_status == "Owner", bedroom_count == "One Bedroom")
+
+own_one_23_sum <- sum(own_one_23$FW)
+
+own_one_23
+own_one_23_sum
+
+own_one_21 <- filled_units_21 %>%
+  filter(legal_status == "Owner", bedroom_count == "One Bedroom")
+own_one_21_sum <- sum(own_one_21$FW)
+  
+own_one_21
+own_one_21_sum
+
+own_one_change <- own_one_23_sum - own_one_21_sum
+
+own_one_change
+```
+
+```{r}
+own_two_23 <- filled_units %>%
+  filter(legal_status == "Owner", bedroom_count == "Two Bedrooms")
+
+own_two_23_sum <- sum(own_two_23$FW)
+
+own_two_23
+own_two_23_sum
+
+own_two_21 <- filled_units_21 %>%
+  filter(legal_status == "Owner", bedroom_count == "Two Bedrooms")
+own_two_21_sum <- sum(own_two_21$FW)
+  
+own_two_21
+own_two_21_sum
+
+own_two_change <- own_two_23_sum - own_two_21_sum
+
+own_two_change
+```
+
+
+```{r}
+own_three_23 <- filled_units %>%
+  filter(legal_status == "Owner", bedroom_count == "Three Bedrooms")
+
+own_three_23_sum <- sum(own_three_23$FW)
+
+own_three_23
+own_three_23_sum
+
+own_three_21 <- filled_units_21 %>%
+  filter(legal_status == "Owner", bedroom_count == "Three Bedrooms")
+own_three_21_sum <- sum(own_three_21$FW)
+  
+own_three_21
+own_three_21_sum
+
+own_three_change <- own_three_23_sum - own_three_21_sum
+
+own_three_change
+```
+
+```{r}
+own_many_23 <- filled_units %>%
+  filter(legal_status == "Owner", bedroom_count == "Four or More Bedrooms")
+
+own_many_23_sum <- sum(own_many_23$FW)
+
+own_many_23
+own_many_23_sum
+
+own_many_21 <- filled_units_21 %>%
+  filter(legal_status == "Owner", bedroom_count == "Four or More Bedrooms")
+own_many_21_sum <- sum(own_many_21$FW)
+  
+own_many_21
+own_many_21_sum
+
+own_many_change <- own_many_23_sum - own_many_21_sum
+
+own_many_change
+```
+
+```{r}
+ts <- data.frame(Status = c("Owner", "Owner", "Owner", "Owner", "Owner", "Rent Regulated (Other)", "Rent Regulated (Other)", "Rent Regulated (Other)", "Rent Regulated (Other)", "Rent Regulated (Other)", "Rent Stabilized", "Rent Stabilized", "Rent Stabilized", "Rent Stabilized", "Rent Stabilized", "Market Rate", "Market Rate", "Market Rate", "Market Rate", "Market Rate"),
+                 Size = c("Studio", "One Bedroom", "Two Bedrooms", "Three Bedrooms", "Four or More Bedrooms", "Studio", "One Bedroom", "Two Bedrooms", "Three Bedrooms", "Four or More Bedrooms", "Studio", "One Bedroom", "Two Bedrooms", "Three Bedrooms", "Four or More Bedrooms", "Studio", "One Bedroom", "Two Bedrooms", "Three Bedrooms", "Four or More Bedrooms"),
+                 Value = c(own_studio_change, own_one_change, own_two_change, own_three_change, own_many_change, reg_studio_change, reg_one_change, reg_two_change, reg_three_change, reg_many_change, stabilized_studio_change, stabilized_one_change, stabilized_two_change, stabilized_three_change, stabilized_many_change, market_studio_change, market_one_change, market_two_change, market_three_change, market_many_change))
+
+ts
+```
+
+```{r}
+ts$Size <- factor(ts$Size, levels=c('Four or More Bedrooms', 'Three Bedrooms', 'Two Bedrooms', "One Bedroom", "Studio"))
+
+ts_bar <- ggplot(data = ts, aes(x = Status, y = Value, fill = Size, group = Size)) +
+              geom_bar(position = "stack", stat = "identity") +
+              scale_fill_hue()
+                      
+                   
+ts_bar
+```
+
+
+
+
+
+```{r}
+#Building the rent-status stacked bar graph using the HVS occupied data set 
+occupied_23 <- read_csv("/Users/lizcooper/Downloads/occupied_puf_23.csv")
+rent_23 <- occupied_23 %>%
+  select(RENT_AMOUNT)
+
+occupied_23
+rent_23
+```
+
+
+
+
+
+
+```{r}
+renter_23 <- occupied_23 %>%
+  filter(TENURE == 1)
+  
+    
+
+renter_23
+```
+
+```{r}
+renter_23 <- renter_23 %>%
+  mutate(rent_bucket = c(0))
+renter_23$rent_bucket <- ifelse(renter_23$RENT_AMOUNT <= 500, "<500",
+                      ifelse(renter_23$RENT_AMOUNT <= 1000, "1000",
+                      ifelse(renter_23$RENT_AMOUNT <= 1500, "1500",
+                      ifelse(renter_23$RENT_AMOUNT <= 2000, "2000",
+                      ifelse(renter_23$RENT_AMOUNT <= 2500, "2500",
+                      ifelse(renter_23$RENT_AMOUNT <= 3000, "3000",
+                      ifelse(renter_23$RENT_AMOUNT <= 3500, "3500",
+                      ifelse(renter_23$RENT_AMOUNT <= 4000, "4000",
+                      ifelse(renter_23$RENT_AMOUNT <= 4500, "4500",
+                      ifelse(renter_23$RENT_AMOUNT <= 5000, "5000",
+                      ifelse(renter_23$RENT_AMOUNT <= 5500, "5500",
+                      ifelse(renter_23$RENT_AMOUNT <= 6000, "6000",
+                      ifelse(renter_23$RENT_AMOUNT <= 6500, "6500",
+                      ifelse(renter_23$RENT_AMOUNT <= 7000, "7000",
+                      ifelse(renter_23$RENT_AMOUNT <= 7500, "7500",
+                      ifelse(renter_23$RENT_AMOUNT <= 8000, "8000",
+                      ifelse(renter_23$RENT_AMOUNT <= 8500, "8500",
+                      ifelse(renter_23$RENT_AMOUNT <= 9000, "9000",
+                      ifelse(renter_23$RENT_AMOUNT <= 9500, "9500",
+                      ifelse(renter_23$RENT_AMOUNT <=10000, "10000",NA))))))))))))))))))))
+test <- renter_23 %>%
+  select(rent_bucket)
+test
+```
+
+```{r}
+joint_23 <- renter_23 %>%
+  inner_join(filled_units)
+
+joint_23
+```
+
+
+
+
+```{r}
+joint_23$legal_status <- factor(joint_23$legal_status, levels=c('Market Rate', 'Rent Regulated (Other)', 'Rent Stabilized'))
+
+income_bar <- ggplot(data = joint_23, aes(x = rent_bucket, y = FW, fill = legal_status, group = legal_status)) +
+              geom_bar(position = "stack", stat = "identity", width = 1) 
+                   
+income_bar
+```
+
+```{r}
+five_k <- joint_23 %>%
+  filter(rent_bucket == '5001-5500') %>%
+    select(rent_bucket, FW)
+
+four_five <- joint_23 %>%
+  filter(rent_bucket == '4501-5000') %>%
+    select(rent_bucket, FW)
+
+five_five <- joint_23 %>%
+  filter(rent_bucket == '5501-6000') %>%
+    select(rent_bucket, FW)
+
+
+
+four_five_sum <- sum(four_five$FW)
+five_k_sum <- sum(five_k$FW)
+five_five_sum <- sum(five_five$FW)
+
+four_five_sum
+five_k_sum
+five_five_sum
+
+```
+
+```{r}
+full_joint <- all_units %>%
+  inner_join(occupied_23)
+
+full_joint
+```
+
+```{r}
+filled_full <- full_joint %>%
+  filter(CSR != "04", CSR != "03")
+
+filled_full <- filled_full %>%
+  mutate(legal_status = 0)
+
+filled_full$legal_status <- ifelse(filled_full$CSR == "02" | filled_full$CSR == "06" | filled_full$CSR == "12" | filled_full$CSR == "96", filled_full$legal_status <- "Owner", 
+                                 ifelse(filled_full$CSR == "32", filled_full$legal_status <- "Rent Stabilized", 
+                                        ifelse(filled_full$CSR == "05" | filled_full$CSR == "90" | filled_full$CSR == "97", filled_full$legal_status <- "Rent Regulated (Other)", 
+                                               ifelse(filled_full$CSR == "80", filled_full$legal_status <- "Market Rate", NA))))
+
+status_full <- filled_full %>%
+  select(legal_status)
+
+filled_full
+status_full
+```
+
+```{r}
+statuses <- c("Owner", "Market Rate", "Rent Stabilized", "Rent Regulated (Other)")
+
+no_heat_values <- c(0,0,0,0)
+for (k in 1:4) {
+  stat <- statuses[k]
+  dummy <- filled_full %>%
+    filter(legal_status == stat)
+  denom_weight <- sum(dummy$FW)
+  no_heat <- dummy %>%
+    filter(NOHEAT == 1)
+  num_weight <- sum(no_heat$FW)
+  no_heat_values[k] = num_weight / denom_weight
+}
+```
+```{r}
+
+no_heat_df <- data.frame(Status = statuses, Weight = no_heat_values)
+
+no_heat_df
+```
+
+```{r}
+no_heat_graph <- ggplot(data = no_heat_df, aes(x = Status, y = Weight)) +
+  geom_bar(stat = "identity")
+
+no_heat_graph
+```
+
